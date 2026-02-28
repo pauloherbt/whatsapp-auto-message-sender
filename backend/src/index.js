@@ -167,7 +167,7 @@ app.get('/api/history', (req, res) => {
     res.json(messageRepo.getHistory());
 });
 
-const port = process.env.API_PORT || 3000;
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
     console.log(`🚀 Backend API running on port ${port}`);
 });
