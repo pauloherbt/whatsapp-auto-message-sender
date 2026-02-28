@@ -100,6 +100,10 @@ const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: path.join(process.cwd(), 'data', 'auth')
     }),
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
+    },
     authTimeoutMs: 120000,
     puppeteer: {
         headless: true,
@@ -114,7 +118,8 @@ const client = new Client({
             '--disable-extensions',
             '--no-default-browser-check',
             '--ignore-certificate-errors',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process'
         ]
     }
 });
