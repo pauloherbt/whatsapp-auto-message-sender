@@ -15,7 +15,7 @@ primary_region = "gru"
   min_machines_running = 1
   processes = ["app"]
 
-[mounts]
+[[mounts]]
   # This creates a persistent disk so your SQLite DB and WhatsApp session don't get wiped
   source = "wpp_data"
   destination = "/app/data"
