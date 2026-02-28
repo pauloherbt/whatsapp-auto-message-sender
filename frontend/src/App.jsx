@@ -9,74 +9,70 @@ import { Toaster } from '@/components/ui/sonner';
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [qrCode, setQrCode] = useState(null);
-
-  const checkStatus = async () => {
-    try {
-      const data = await api.getStatus();
-      setIsConnected(data.connected);
-      if (!data.connected && data.qr) {
-        setQrCode(data.qr);
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const data = await api.getStatus();
+        setIsConnected(data.connected);
+        if (!data.connected && data.qr) {
+          setQrCode(data.qr);
+        }
+      } catch (err) {
+        console.error('Status check error:', err);
       }
-    } catch (err) {
-      console.error('Status check error:', err);
-    }
-  };
+    };
 
-  // Initial check
-  checkStatus();
+    // Initial check
+    checkStatus();
 
-  // Poll every 5 seconds if not connected
-  let timeoutId;
-  const poll = async () => {
-    if (!isConnected) {
+    // Poll every 10 seconds to reduce server load
+    let timeoutId;
+    const poll = async () => {
       await checkStatus();
-      timeoutId = setTimeout(poll, 5000);
-    }
-  };
+      timeoutId = setTimeout(poll, 10000);
+    };
 
-  if (!isConnected) {
-    timeoutId = setTimeout(poll, 5000);
-  }
+    timeoutId = setTimeout(poll, 10000);
 
-  return () => {
-    if (timeoutId) clearTimeout(timeoutId);
-  };
-}, [isConnected]);
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, []);
 
-return (
-  <div className="text-gray-800 antialiased min-h-screen flex flex-col items-center py-4 px-2 sm:py-6 sm:px-4 bg-gray-50">
-    {/* Header */}
-    <header className="w-full max-w-5xl flex flex-col sm:flex-row gap-4 justify-between items-center mb-6 sm:mb-8 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-sm border border-gray-100 text-center sm:text-left">
-      <div className="flex items-center gap-3">
-        <div className="bg-green-500 text-white p-2 rounded-lg shadow-sm">
-          <MessageCircle className="w-6 h-6" />
+  return (
+    <div className="text-gray-800 antialiased min-h-screen flex flex-col items-center py-4 px-2 sm:py-6 sm:px-4 bg-gray-50">
+      {/* Header */}
+      <header className="w-full max-w-5xl flex flex-col sm:flex-row gap-4 justify-between items-center mb-6 sm:mb-8 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-sm border border-gray-100 text-center sm:text-left">
+        <div className="flex items-center gap-3">
+          <div className="bg-green-500 text-white p-2 rounded-lg shadow-sm">
+            <MessageCircle className="w-6 h-6" />
+          </div>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900">WPP Gerenciador de Grupos</h1>
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-gray-900">WPP Gerenciador de Grupos</h1>
-      </div>
-      <div>
+        <div>
+          {isConnected ? (
+            <Badge variant="default" className="bg-green-100 text-green-700 hover:bg-green-100 font-semibold px-3 py-1 text-sm rounded-full">
+              Conectado
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 font-semibold px-3 py-1 text-sm rounded-full">
+              Aguardando QR Code
+            </Badge>
+          )}
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="w-full max-w-5xl">
         {isConnected ? (
-          <Badge variant="default" className="bg-green-100 text-green-700 hover:bg-green-100 font-semibold px-3 py-1 text-sm rounded-full">
-            Conectado
-          </Badge>
+          <Dashboard />
         ) : (
-          <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 font-semibold px-3 py-1 text-sm rounded-full">
-            Aguardando QR Code
-          </Badge>
+          <QRScanner qrCode={qrCode} />
         )}
       </div>
-    </header>
 
-    {/* Main Content */}
-    <div className="w-full max-w-5xl">
-      {isConnected ? (
-        <Dashboard />
-      ) : (
-        <QRScanner qrCode={qrCode} />
-      )}
+      {/* Sonner Toasts */}
+      <Toaster position="bottom-right" richColors />
     </div>
-
-    {/* Sonner Toasts */}
-    <Toaster position="bottom-right" richColors />
-  </div>
-);
+  );
 }
