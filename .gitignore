@@ -1,0 +1,10 @@
+node_modules/
+.env
+data/
+qrcode_temp.txt
+*.db
+backend/node_modules/
+backend/.env
+backend/data/
+backend/.wwebjs_auth/
+frontend/node_modules/

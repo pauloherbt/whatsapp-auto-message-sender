@@ -1,0 +1,25 @@
+app = "wpp-group-manager"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false # Keep machine alive to listen for WhatsApp messages
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[mounts]
+  # This creates a persistent disk so your SQLite DB and WhatsApp session don't get wiped
+  source = "wpp_data"
+  destination = "/app/data"
+
+[[mounts]]
+  source = "wpp_session"
+  destination = "/app/.wwebjs_auth"
