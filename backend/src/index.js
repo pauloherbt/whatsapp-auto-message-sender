@@ -46,6 +46,7 @@ const broadcastUC = new BroadcastMessage(messagingGateway, listRepo, groupRepo, 
 
 let latestQR = null;
 let isConnected = false;
+let isAuthenticating = false;
 
 client.on('qr', (qr) => {
     // Sanitize QR string: some versions/environments prefix it with 'undefined,'
@@ -53,25 +54,31 @@ client.on('qr', (qr) => {
     console.log('[whatsapp-web] QR Code received (sanitized). Ready to scan.');
     latestQR = sanitizedQR;
     isConnected = false;
+    isAuthenticating = false;
 });
 
 client.on('authenticated', () => {
     console.log(`✅ WhatsApp Authenticated! Creating session...`);
+    latestQR = null;
+    isAuthenticating = true;
 });
 
 client.on('auth_failure', (msg) => {
     console.error(`❌ Authentication Failure: ${msg}`);
+    isAuthenticating = false;
 });
 
 client.on('ready', () => {
     console.log(`✅ WhatsApp Web Client Ready and Session Active!`);
     latestQR = null;
     isConnected = true;
+    isAuthenticating = false;
 });
 
 client.on('disconnected', (reason) => {
     console.log(`❌ WhatsApp Web Client Disconnected: ${reason}`);
     isConnected = false;
+    isAuthenticating = false;
 });
 
 // Start the client
@@ -84,6 +91,7 @@ client.initialize();
 app.get('/api/status', (req, res) => {
     res.json({
         connected: isConnected,
+        authenticating: isAuthenticating,
         qr: latestQR
     });
 });
