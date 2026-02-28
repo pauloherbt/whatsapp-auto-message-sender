@@ -55,14 +55,22 @@ client.on('qr', (qr) => {
     isConnected = false;
 });
 
+client.on('authenticated', () => {
+    console.log(`✅ WhatsApp Authenticated! Creating session...`);
+});
+
+client.on('auth_failure', (msg) => {
+    console.error(`❌ Authentication Failure: ${msg}`);
+});
+
 client.on('ready', () => {
-    console.log(`✅ WhatsApp Web Client Ready!`);
+    console.log(`✅ WhatsApp Web Client Ready and Session Active!`);
     latestQR = null;
     isConnected = true;
 });
 
-client.on('disconnected', () => {
-    console.log(`❌ WhatsApp Web Client Disconnected!`);
+client.on('disconnected', (reason) => {
+    console.log(`❌ WhatsApp Web Client Disconnected: ${reason}`);
     isConnected = false;
 });
 
