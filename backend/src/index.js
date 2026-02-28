@@ -48,8 +48,10 @@ let latestQR = null;
 let isConnected = false;
 
 client.on('qr', (qr) => {
-    console.log('[whatsapp-web] Target acquired. QR Code ready to scan.');
-    latestQR = qr;
+    // Sanitize QR string: some versions/environments prefix it with 'undefined,'
+    const sanitizedQR = qr.startsWith('undefined,') ? qr.substring(10) : qr;
+    console.log('[whatsapp-web] QR Code received (sanitized). Ready to scan.');
+    latestQR = sanitizedQR;
     isConnected = false;
 });
 
