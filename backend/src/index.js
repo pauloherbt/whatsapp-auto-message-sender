@@ -33,6 +33,14 @@ app.listen(port, '0.0.0.0', () => {
 
 app.get('/', (req, res) => res.send('WhatsApp Bot API is running!'));
 
+process.on('unhandledRejection', (reason, p) => {
+    console.error('[process] Unhandled Rejection at:', p, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('[process] Uncaught Exception:', err);
+});
+
 const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: path.join(process.cwd(), 'data', 'auth')
@@ -48,6 +56,9 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--disable-gpu',
+            '--disable-extensions',
+            '--no-default-browser-check',
+            '--ignore-certificate-errors',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ]
     }
