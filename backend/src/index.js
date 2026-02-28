@@ -99,7 +99,28 @@ client.on('disconnected', (reason) => {
     isAuthenticating = false;
 });
 
+// Function to cleanup Puppeteer locks that might cause hangs on persistent volumes
+function cleanupLocks() {
+    try {
+        const lockPath = path.join(process.cwd(), 'data', 'auth', 'Default', 'SingletonLock');
+        if (fs.existsSync(lockPath)) {
+            console.log('[cleanup] Removing stale SingletonLock...');
+            fs.unlinkSync(lockPath);
+        }
+        const socketPath = path.join(process.cwd(), 'data', 'auth', 'Default', 'SingletonSocket');
+        if (fs.existsSync(socketPath)) {
+            console.log('[cleanup] Removing stale SingletonSocket...');
+            fs.unlinkSync(socketPath);
+        }
+    } catch (err) {
+        console.warn('[cleanup] Warning while clearing locks:', err.message);
+    }
+}
+
 // Start the client
+console.log('[whatsapp-web] Cleaning up potential locks...');
+cleanupLocks();
+
 console.log('[whatsapp-web] Initializing WhatsApp Client...');
 client.initialize().then(() => {
     console.log('[whatsapp-web] client.initialize() promise resolved.');
@@ -108,6 +129,41 @@ client.initialize().then(() => {
 });
 
 // --- API ROUTES ---
+
+// Root Health Check for Fly.io
+app.get('/', (req, res) => {
+    res.send(`
+        <h1>WPP Group Manager API</h1>
+        <p>Status: Running</p>
+        <p>WhatsApp Connected: ${isConnected}</p>
+        <p>Authenticating: ${isAuthenticating}</p>
+        <p>QR Code Ready: ${latestQR ? 'Yes' : 'No'}</p>
+        <hr>
+        <form action="/api/reset-session" method="POST">
+            <button type="submit" style="background:red; color:white; padding:10px; border:none; border-radius:5px; cursor:pointer;">
+                DANGER: Reset WhatsApp Session
+            </button>
+        </form>
+    `);
+});
+
+// Emergency Reset Route
+app.post('/api/reset-session', (req, res) => {
+    console.log('[danger] Manual Session Reset Triggered');
+    try {
+        const authPath = path.join(process.cwd(), 'data', 'auth');
+        if (fs.existsSync(authPath)) {
+            fs.rmSync(authPath, { recursive: true, force: true });
+            console.log('[danger] Session folder deleted. Restarting process...');
+            res.send('Session deleted. The app will restart now (Fly.io will auto-restart it).');
+            setTimeout(() => process.exit(1), 1000); // Exit and let Fly.io restart it
+        } else {
+            res.send('Session folder not found.');
+        }
+    } catch (err) {
+        res.status(500).send('Error resetting session: ' + err.message);
+    }
+});
 
 // 1. Status & Auth
 app.get('/api/status', (req, res) => {
