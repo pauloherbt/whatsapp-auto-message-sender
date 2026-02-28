@@ -32,7 +32,7 @@ COPY . .
 RUN mkdir -p data .wwebjs_auth
 
 # Expose backend port
-EXPOSE 3000
+EXPOSE 8080
 
 # Start server
 CMD ["node", "src/index.js"]
