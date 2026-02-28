@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 // When running on Vercel, this will use the VITE_API_URL environment variable (pointing to Fly.io).
-// If running locally, it falls back to localhost:3000.
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+// If running locally, it falls back to localhost:8080.
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 const apiClient = axios.create({
     baseURL: API_URL,
@@ -43,26 +43,28 @@ export const api = {
     },
 
     getGroupsInList: async (listId) => {
-        const res = await apiClient.get(`/groups/${listId}`);
+        // Backend: GET /api/lists/:id/groups
+        const res = await apiClient.get(`/lists/${listId}/groups`);
         return res.data;
     },
 
-    addGroupToList: async (listId, wppGroupId, name) => {
-        const res = await apiClient.post('/groups/add', {
-            list_id: listId,
-            wpp_group_id: wppGroupId,
+    addGroupToList: async (listId, wppId, name) => {
+        // Backend: POST /api/lists/:id/groups
+        const res = await apiClient.post(`/lists/${listId}/groups`, {
+            wppId,
             name
         });
         return res.data;
     },
 
     removeGroupFromList: async (groupId) => {
+        // Backend: DELETE /api/groups/:id
         const res = await apiClient.delete(`/groups/${groupId}`);
         return res.data;
     },
 
     sendBroadcast: async (listId, message) => {
-        const res = await apiClient.post('/broadcast', { list_id: listId, message });
+        const res = await apiClient.post('/broadcast', { listId, message });
         return res.data;
     },
 
