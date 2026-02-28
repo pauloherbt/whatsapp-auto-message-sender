@@ -29,6 +29,12 @@ const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: path.join(process.cwd(), 'data', 'auth')
     }),
+    authTimeoutMs: 120000, // Increase timeout to 2 minutes
+    webVersion: '2.3000.1014711091',
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1014711091-alt.html'
+    },
     puppeteer: {
         headless: true,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
