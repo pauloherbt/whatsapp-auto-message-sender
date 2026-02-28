@@ -20,18 +20,72 @@ const BroadcastMessage = require('./application/use-cases/BroadcastMessage');
 const listUC = new ManageLists(listRepo);
 const groupUC = new ManageGroups(groupRepo, listRepo);
 
+const fs = require('fs');
+
 // Initialize WhatsApp Client & App
 const app = express();
 app.use(express.json());
 app.use(cors());
 
+// Variables for status tracking
+let latestQR = null;
+let isConnected = false;
+let isAuthenticating = false;
+
 // --- START SERVER IMMEDIATELY FOR FLY.IO HEALTH CHECKS ---
 const port = process.env.PORT || 8080;
+
+app.get('/', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>WPP Recovery Dashboard</title></head>
+        <body style="font-family: sans-serif; padding: 20px; text-align: center;">
+            <h1>WPP Group Manager API</h1>
+            <div style="background: #f0f0f0; padding: 15px; border-radius: 10px; display: inline-block; text-align: left;">
+                <p><strong>Status:</strong> Running</p>
+                <p><strong>WhatsApp:</strong> ${isConnected ? '✅ Connected' : '❌ Disconnected'}</p>
+                <p><strong>Auth State:</strong> ${isAuthenticating ? '⏳ Authenticating...' : 'Idle'}</p>
+                <p><strong>QR available:</strong> ${latestQR ? '✅ Yes' : '❌ No'}</p>
+            </div>
+            <hr style="margin: 20px 0;">
+            <form action="/api/reset-session" method="POST" onsubmit="return confirm('ATENÇÃO: Isso vai apagar todo o login do WhatsApp. Tem certeza?')">
+                <button type="submit" style="background:red; color:white; padding:15px; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+                    DANGER: Reset WhatsApp Session & Data
+                </button>
+            </form>
+            <p style="color: gray; font-size: 0.8em; margin-top: 20px;">Use este botão se o QR Code travar ou se o WhatsApp deslogar sozinho.</p>
+        </body>
+        </html>
+    `);
+});
+
+app.post('/api/reset-session', (req, res) => {
+    console.log('[danger] Manual Session Reset Triggered');
+    try {
+        const authPath = path.join(process.cwd(), 'data', 'auth');
+        if (fs.existsSync(authPath)) {
+            fs.rmSync(authPath, { recursive: true, force: true });
+            console.log('[danger] Session folder deleted.');
+        }
+        res.send('Session deleted. The app will restart now.');
+        setTimeout(() => process.exit(1), 1000);
+    } catch (err) {
+        res.status(500).send('Error resetting session: ' + err.message);
+    }
+});
+
+app.get('/api/status', (req, res) => {
+    res.json({
+        connected: isConnected,
+        authenticating: isAuthenticating,
+        qr: latestQR
+    });
+});
+
 app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Backend API running on port ${port}`);
 });
-
-app.get('/', (req, res) => res.send('WhatsApp Bot API is running!'));
 
 process.on('unhandledRejection', (reason, p) => {
     console.error('[process] Unhandled Rejection at:', p, 'reason:', reason);
@@ -41,6 +95,7 @@ process.on('uncaughtException', (err) => {
     console.error('[process] Uncaught Exception:', err);
 });
 
+// --- WHATSAPP CLIENT SETUP ---
 const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: path.join(process.cwd(), 'data', 'auth')
@@ -67,14 +122,7 @@ const client = new Client({
 const messagingGateway = new WhatsAppWebJsGateway(client);
 const broadcastUC = new BroadcastMessage(messagingGateway, listRepo, groupRepo, messageRepo);
 
-let latestQR = null;
-let isConnected = false;
-let isAuthenticating = false;
-
-console.log('[whatsapp-web] Hooking events...');
-
 client.on('qr', (qr) => {
-    // Sanitize QR string: some versions/environments prefix it with 'undefined,'
     const sanitizedQR = qr.startsWith('undefined,') ? qr.substring(10) : qr;
     console.log('[whatsapp-web] QR Code received! Ready to scan.');
     latestQR = sanitizedQR;
@@ -110,7 +158,6 @@ client.on('disconnected', (reason) => {
     isAuthenticating = false;
 });
 
-// Function to cleanup Puppeteer locks that might cause hangs on persistent volumes
 function cleanupLocks() {
     try {
         const lockPath = path.join(process.cwd(), 'data', 'auth', 'Default', 'SingletonLock');
@@ -118,74 +165,15 @@ function cleanupLocks() {
             console.log('[cleanup] Removing stale SingletonLock...');
             fs.unlinkSync(lockPath);
         }
-        const socketPath = path.join(process.cwd(), 'data', 'auth', 'Default', 'SingletonSocket');
-        if (fs.existsSync(socketPath)) {
-            console.log('[cleanup] Removing stale SingletonSocket...');
-            fs.unlinkSync(socketPath);
-        }
-    } catch (err) {
-        console.warn('[cleanup] Warning while clearing locks:', err.message);
-    }
+    } catch (err) { }
 }
 
-// Start the client
-console.log('[whatsapp-web] Cleaning up potential locks...');
+console.log('[whatsapp-web] Initializing...');
 cleanupLocks();
-
-console.log('[whatsapp-web] Initializing WhatsApp Client...');
-client.initialize().then(() => {
-    console.log('[whatsapp-web] client.initialize() promise resolved.');
-}).catch(err => {
-    console.error('[whatsapp-web] client.initialize() error:', err);
-});
+client.initialize().catch(err => console.error('[whatsapp-web] Fatal init error:', err));
 
 // --- API ROUTES ---
 
-// Root Health Check for Fly.io
-app.get('/', (req, res) => {
-    res.send(`
-        <h1>WPP Group Manager API</h1>
-        <p>Status: Running</p>
-        <p>WhatsApp Connected: ${isConnected}</p>
-        <p>Authenticating: ${isAuthenticating}</p>
-        <p>QR Code Ready: ${latestQR ? 'Yes' : 'No'}</p>
-        <hr>
-        <form action="/api/reset-session" method="POST">
-            <button type="submit" style="background:red; color:white; padding:10px; border:none; border-radius:5px; cursor:pointer;">
-                DANGER: Reset WhatsApp Session
-            </button>
-        </form>
-    `);
-});
-
-// Emergency Reset Route
-app.post('/api/reset-session', (req, res) => {
-    console.log('[danger] Manual Session Reset Triggered');
-    try {
-        const authPath = path.join(process.cwd(), 'data', 'auth');
-        if (fs.existsSync(authPath)) {
-            fs.rmSync(authPath, { recursive: true, force: true });
-            console.log('[danger] Session folder deleted. Restarting process...');
-            res.send('Session deleted. The app will restart now (Fly.io will auto-restart it).');
-            setTimeout(() => process.exit(1), 1000); // Exit and let Fly.io restart it
-        } else {
-            res.send('Session folder not found.');
-        }
-    } catch (err) {
-        res.status(500).send('Error resetting session: ' + err.message);
-    }
-});
-
-// 1. Status & Auth
-app.get('/api/status', (req, res) => {
-    res.json({
-        connected: isConnected,
-        authenticating: isAuthenticating,
-        qr: latestQR
-    });
-});
-
-// 2. WhatsApp Groups integration
 app.get('/api/whatsapp-groups', async (req, res) => {
     if (!isConnected) return res.status(400).json({ error: 'Client not connected' });
     try {
@@ -196,88 +184,57 @@ app.get('/api/whatsapp-groups', async (req, res) => {
     }
 });
 
-// 3. Lists Management
-app.get('/api/lists', (req, res) => {
-    res.json(listUC.getAll());
-});
+app.get('/api/lists', (req, res) => res.json(listUC.getAll()));
 
 app.post('/api/lists', (req, res) => {
     try {
         const { name } = req.body;
         if (!name) return res.status(400).json({ error: 'Name is required' });
-        const list = listUC.create(name);
-        res.json(list);
-    } catch (e) {
-        res.status(400).json({ error: e.message });
-    }
+        res.json(listUC.create(name));
+    } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 app.put('/api/lists/:id', (req, res) => {
     try {
         const { name } = req.body;
-        if (!name) return res.status(400).json({ error: 'New name is required' });
-        const list = listUC.rename(req.params.id, name);
-        res.json(list);
-    } catch (e) {
-        res.status(400).json({ error: e.message });
-    }
+        res.json(listUC.rename(req.params.id, name));
+    } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 app.delete('/api/lists/:id', (req, res) => {
     try {
         listUC.remove(req.params.id);
         res.json({ success: true });
-    } catch (e) {
-        res.status(400).json({ error: e.message });
-    }
+    } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// 4. Groups in Lists Management
 app.get('/api/lists/:id/groups', (req, res) => {
-    try {
-        const groups = groupUC.forList(req.params.id);
-        res.json(groups);
-    } catch (e) {
-        res.status(400).json({ error: e.message });
-    }
+    try { res.json(groupUC.forList(req.params.id)); }
+    catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 app.post('/api/lists/:id/groups', (req, res) => {
     try {
         const { wppId, name } = req.body;
-        if (!wppId) return res.status(400).json({ error: 'wppId is required' });
-
         groupUC.add(req.params.id, wppId, name || '');
         res.json({ success: true });
-    } catch (e) {
-        res.status(400).json({ error: e.message });
-    }
+    } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 app.delete('/api/groups/:id', (req, res) => {
     try {
         groupUC.remove(req.params.id);
         res.json({ success: true });
-    } catch (e) {
-        res.status(400).json({ error: e.message });
-    }
+    } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// 5. Broadcasts
 app.post('/api/broadcast', async (req, res) => {
     if (!isConnected) return res.status(400).json({ error: 'Client not connected' });
     try {
         const { listId, message } = req.body;
-        if (!listId || !message) return res.status(400).json({ error: 'listId and message are required' });
-
         const result = await broadcastUC.execute({ listId, content: message, sentBy: 'Web UI' });
         res.json(result);
-    } catch (e) {
-        res.status(400).json({ error: e.message });
-    }
+    } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// 6. History
-app.get('/api/history', (req, res) => {
-    res.json(messageRepo.getHistory());
-});
+app.get('/api/history', (req, res) => res.json(messageRepo.getHistory()));
