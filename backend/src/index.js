@@ -31,6 +31,7 @@ const client = new Client({
     }),
     puppeteer: {
         headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -50,13 +51,19 @@ let latestQR = null;
 let isConnected = false;
 let isAuthenticating = false;
 
+console.log('[whatsapp-web] Hooking events...');
+
 client.on('qr', (qr) => {
     // Sanitize QR string: some versions/environments prefix it with 'undefined,'
     const sanitizedQR = qr.startsWith('undefined,') ? qr.substring(10) : qr;
-    console.log('[whatsapp-web] QR Code received (sanitized). Ready to scan.');
+    console.log('[whatsapp-web] QR Code received! Ready to scan.');
     latestQR = sanitizedQR;
     isConnected = false;
     isAuthenticating = false;
+});
+
+client.on('loading_screen', (percent, message) => {
+    console.log('[whatsapp-web] Loading:', percent, message);
 });
 
 client.on('authenticated', () => {
@@ -84,8 +91,12 @@ client.on('disconnected', (reason) => {
 });
 
 // Start the client
-console.log('Initializing WhatsApp Client...');
-client.initialize();
+console.log('[whatsapp-web] Initializing WhatsApp Client...');
+client.initialize().then(() => {
+    console.log('[whatsapp-web] client.initialize() promise resolved.');
+}).catch(err => {
+    console.error('[whatsapp-web] client.initialize() error:', err);
+});
 
 // --- API ROUTES ---
 
