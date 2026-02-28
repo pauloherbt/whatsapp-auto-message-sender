@@ -25,16 +25,19 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+// --- START SERVER IMMEDIATELY FOR FLY.IO HEALTH CHECKS ---
+const port = process.env.PORT || 8080;
+app.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Backend API running on port ${port}`);
+});
+
+app.get('/', (req, res) => res.send('WhatsApp Bot API is running!'));
+
 const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: path.join(process.cwd(), 'data', 'auth')
     }),
-    authTimeoutMs: 120000, // Increase timeout to 2 minutes
-    webVersion: '2.3000.1014711091',
-    webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1014711091-alt.html'
-    },
+    authTimeoutMs: 120000,
     puppeteer: {
         headless: true,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
@@ -210,9 +213,4 @@ app.post('/api/broadcast', async (req, res) => {
 // 6. History
 app.get('/api/history', (req, res) => {
     res.json(messageRepo.getHistory());
-});
-
-const port = process.env.PORT || 3000;
-app.listen(port, '0.0.0.0', () => {
-    console.log(`🚀 Backend API running on port ${port}`);
 });
