@@ -8,12 +8,14 @@ import { Toaster } from '@/components/ui/sonner';
 
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [qrCode, setQrCode] = useState(null);
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const data = await api.getStatus();
         setIsConnected(data.connected);
+        setIsAuthenticating(data.authenticating);
         if (!data.connected && data.qr) {
           setQrCode(data.qr);
         }
@@ -54,6 +56,10 @@ export default function App() {
             <Badge variant="default" className="bg-green-100 text-green-700 hover:bg-green-100 font-semibold px-3 py-1 text-sm rounded-full">
               Conectado
             </Badge>
+          ) : isAuthenticating ? (
+            <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 font-semibold px-3 py-1 text-sm rounded-full">
+              Autenticando...
+            </Badge>
           ) : (
             <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 font-semibold px-3 py-1 text-sm rounded-full">
               Aguardando QR Code
@@ -67,7 +73,7 @@ export default function App() {
         {isConnected ? (
           <Dashboard />
         ) : (
-          <QRScanner qrCode={qrCode} />
+          <QRScanner qrCode={qrCode} isAuthenticating={isAuthenticating} />
         )}
       </div>
 
