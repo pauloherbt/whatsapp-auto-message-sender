@@ -100,11 +100,12 @@ const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: path.join(process.cwd(), 'data', 'auth')
     }),
+    authTimeoutMs: 180000, // Increase to 3 minutes
+    webVersion: '2.3000.1015901307',
     webVersionCache: {
         type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1015901307-alt.html'
     },
-    authTimeoutMs: 120000,
     puppeteer: {
         headless: true,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
@@ -118,8 +119,7 @@ const client = new Client({
             '--disable-extensions',
             '--no-default-browser-check',
             '--ignore-certificate-errors',
-            '--disable-web-security',
-            '--disable-features=IsolateOrigins,site-per-process'
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ]
     }
 });
@@ -136,18 +136,21 @@ client.on('qr', (qr) => {
 });
 
 client.on('loading_screen', (percent, message) => {
-    console.log('[whatsapp-web] Loading:', percent, message);
+    console.log(`[whatsapp-web] Loading Screen: ${percent}% - ${message}`);
 });
 
 client.on('authenticated', () => {
-    console.log(`✅ WhatsApp Authenticated! Creating session...`);
+    console.log(`✅ WhatsApp Authenticated! Handshake complete. Syncing data...`);
     latestQR = null;
     isAuthenticating = true;
+    isConnected = false;
 });
 
 client.on('auth_failure', (msg) => {
-    console.error(`❌ Authentication Failure: ${msg}`);
+    console.error(`❌ Authentication Failure:`, msg);
+    latestQR = null;
     isAuthenticating = false;
+    isConnected = false;
 });
 
 client.on('ready', () => {
