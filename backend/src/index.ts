@@ -94,7 +94,26 @@ process.on('uncaughtException', (err) => {
     console.error('[process] Uncaught Exception:', err);
 });
 
-// --- WHATSAPP CLIENT SETUP ---
+const puppeteerOptions: any = {
+    headless: true,
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--disable-gpu',
+        '--disable-extensions',
+        '--no-default-browser-check',
+        '--ignore-certificate-errors',
+        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    ]
+};
+
+if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+}
+
 const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: path.join(process.cwd(), 'data', 'auth')
@@ -105,21 +124,7 @@ const client = new Client({
         type: 'remote',
         remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1015901307-alt.html'
     },
-    puppeteer: {
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--disable-gpu',
-            '--disable-extensions',
-            '--no-default-browser-check',
-            '--ignore-certificate-errors',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        ]
-    }
+    puppeteer: puppeteerOptions
 });
 
 const messagingGateway = new WhatsAppWebJsGateway(client);
