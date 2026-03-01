@@ -21,12 +21,16 @@ WORKDIR /app
 
 # Copy dependency files
 COPY package*.json ./
+COPY tsconfig.json ./
 
-# Install npm dependencies (including whatsapp-web.js, express, etc)
+# Install npm dependencies (including whatsapp-web.js, express, typescript, etc)
 RUN npm install
 
 # Copy application source code
 COPY . .
+
+# Build the Typescript application
+RUN npm run build
 
 # Create the data and session directories expected by the app so volume mounting works cleanly
 RUN mkdir -p data .wwebjs_auth
@@ -34,5 +38,5 @@ RUN mkdir -p data .wwebjs_auth
 # Expose backend port
 EXPOSE 8080
 
-# Start server
-CMD ["node", "src/index.js"]
+# Start server from dist
+CMD ["node", "dist/index.js"]

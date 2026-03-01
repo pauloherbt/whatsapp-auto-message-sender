@@ -1,23 +1,23 @@
-'use strict';
-
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
 
 class SqliteDatabase {
-    constructor() {
-        const dbPath = path.join(process.cwd(), 'data', 'bot.db');
-        fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  public db: Database.Database;
 
-        this.db = new Database(dbPath);
-        this.db.pragma('journal_mode = WAL');
-        this.db.pragma('foreign_keys = ON');
+  constructor() {
+    const dbPath = path.join(process.cwd(), 'data', 'bot.db');
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
-        this._initSchema();
-    }
+    this.db = new Database(dbPath);
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('foreign_keys = ON');
 
-    _initSchema() {
-        this.db.exec(`
+    this._initSchema();
+  }
+
+  private _initSchema() {
+    this.db.exec(`
           CREATE TABLE IF NOT EXISTS lists (
             id   INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT    NOT NULL UNIQUE
@@ -42,16 +42,16 @@ class SqliteDatabase {
             success      INTEGER NOT NULL DEFAULT 0
           );
         `);
-    }
+  }
 
-    prepare(sql) {
-        return this.db.prepare(sql);
-    }
+  prepare(sql: string): Database.Statement {
+    return this.db.prepare(sql);
+  }
 
-    exec(sql) {
-        return this.db.exec(sql);
-    }
+  exec(sql: string): Database.Database {
+    return this.db.exec(sql);
+  }
 }
 
-// Singleton for easy access if needed, but better injected in DDD.
-module.exports = new SqliteDatabase();
+// Singleton for easy access
+export default new SqliteDatabase();

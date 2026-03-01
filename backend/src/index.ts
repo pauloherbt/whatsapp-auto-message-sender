@@ -1,26 +1,25 @@
-'use strict';
+import dotenv from 'dotenv';
+dotenv.config();
 
-require('dotenv').config();
-const path = require('path');
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const express = require('express');
-const cors = require('cors');
+import path from 'path';
+import { Client, LocalAuth } from 'whatsapp-web.js';
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import fs from 'fs';
 
 // Infrastructure
-const WhatsAppWebJsGateway = require('./infrastructure/messaging/WhatsAppWebJsGateway');
-const listRepo = require('./infrastructure/persistence/SqliteListRepository');
-const groupRepo = require('./infrastructure/persistence/SqliteGroupRepository');
-const messageRepo = require('./infrastructure/persistence/SqliteMessageRepository');
+import WhatsAppWebJsGateway from './infrastructure/messaging/WhatsAppWebJsGateway';
+import listRepo from './infrastructure/persistence/SqliteListRepository';
+import groupRepo from './infrastructure/persistence/SqliteGroupRepository';
+import messageRepo from './infrastructure/persistence/SqliteMessageRepository';
 
 // Application Use Cases
-const ManageLists = require('./application/use-cases/ManageLists');
-const ManageGroups = require('./application/use-cases/ManageGroups');
-const BroadcastMessage = require('./application/use-cases/BroadcastMessage');
+import ManageLists from './application/use-cases/ManageLists';
+import ManageGroups from './application/use-cases/ManageGroups';
+import BroadcastMessage from './application/use-cases/BroadcastMessage';
 
 const listUC = new ManageLists(listRepo);
 const groupUC = new ManageGroups(groupRepo, listRepo);
-
-const fs = require('fs');
 
 // Initialize WhatsApp Client & App
 const app = express();
@@ -28,14 +27,14 @@ app.use(express.json());
 app.use(cors());
 
 // Variables for status tracking
-let latestQR = null;
+let latestQR: string | null = null;
 let isConnected = false;
 let isAuthenticating = false;
 
 // --- START SERVER IMMEDIATELY FOR FLY.IO HEALTH CHECKS ---
 const port = process.env.PORT || 8080;
 
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
     res.send(`
         <!DOCTYPE html>
         <html>
@@ -60,7 +59,7 @@ app.get('/', (req, res) => {
     `);
 });
 
-app.post('/api/reset-session', (req, res) => {
+app.post('/api/reset-session', (req: Request, res: Response) => {
     console.log('[danger] Manual Session Reset Triggered');
     try {
         const authPath = path.join(process.cwd(), 'data', 'auth');
@@ -70,12 +69,12 @@ app.post('/api/reset-session', (req, res) => {
         }
         res.send('Session deleted. The app will restart now.');
         setTimeout(() => process.exit(1), 1000);
-    } catch (err) {
+    } catch (err: any) {
         res.status(500).send('Error resetting session: ' + err.message);
     }
 });
 
-app.get('/api/status', (req, res) => {
+app.get('/api/status', (req: Request, res: Response) => {
     res.json({
         connected: isConnected,
         authenticating: isAuthenticating,
@@ -83,7 +82,7 @@ app.get('/api/status', (req, res) => {
     });
 });
 
-app.listen(port, '0.0.0.0', () => {
+app.listen(port, () => {
     console.log(`🚀 Backend API running on port ${port}`);
 });
 
@@ -127,7 +126,7 @@ const client = new Client({
 const messagingGateway = new WhatsAppWebJsGateway(client);
 const broadcastUC = new BroadcastMessage(messagingGateway, listRepo, groupRepo, messageRepo);
 
-client.on('qr', (qr) => {
+client.on('qr', (qr: string) => {
     const sanitizedQR = qr.startsWith('undefined,') ? qr.substring(10) : qr;
     console.log('[whatsapp-web] QR Code received! Ready to scan.');
     latestQR = sanitizedQR;
@@ -135,7 +134,7 @@ client.on('qr', (qr) => {
     isAuthenticating = false;
 });
 
-client.on('loading_screen', (percent, message) => {
+client.on('loading_screen', (percent: string, message: string) => {
     console.log(`[whatsapp-web] Loading Screen: ${percent}% - ${message}`);
 });
 
@@ -146,7 +145,7 @@ client.on('authenticated', () => {
     isConnected = false;
 });
 
-client.on('auth_failure', (msg) => {
+client.on('auth_failure', (msg: string) => {
     console.error(`❌ Authentication Failure:`, msg);
     latestQR = null;
     isAuthenticating = false;
@@ -160,7 +159,7 @@ client.on('ready', () => {
     isAuthenticating = false;
 });
 
-client.on('disconnected', (reason) => {
+client.on('disconnected', (reason: any) => {
     console.log(`❌ WhatsApp Web Client Disconnected: ${reason}`);
     isConnected = false;
     isAuthenticating = false;
@@ -182,67 +181,67 @@ client.initialize().catch(err => console.error('[whatsapp-web] Fatal init error:
 
 // --- API ROUTES ---
 
-app.get('/api/whatsapp-groups', async (req, res) => {
-    if (!isConnected) return res.status(400).json({ error: 'Client not connected' });
+app.get('/api/whatsapp-groups', async (req: Request, res: Response): Promise<void> => {
+    if (!isConnected) { res.status(400).json({ error: 'Client not connected' }); return; }
     try {
         const groups = await messagingGateway.fetchGroups();
         res.json(groups);
-    } catch (e) {
+    } catch (e: any) {
         res.status(500).json({ error: e.message });
     }
 });
 
-app.get('/api/lists', (req, res) => res.json(listUC.getAll()));
+app.get('/api/lists', (req: Request, res: Response) => { res.json(listUC.getAll()); });
 
-app.post('/api/lists', (req, res) => {
+app.post('/api/lists', (req: Request, res: Response): void => {
     try {
         const { name } = req.body;
-        if (!name) return res.status(400).json({ error: 'Name is required' });
+        if (!name) { res.status(400).json({ error: 'Name is required' }); return; }
         res.json(listUC.create(name));
-    } catch (e) { res.status(400).json({ error: e.message }); }
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
-app.put('/api/lists/:id', (req, res) => {
+app.put('/api/lists/:id', (req: Request, res: Response) => {
     try {
         const { name } = req.body;
-        res.json(listUC.rename(req.params.id, name));
-    } catch (e) { res.status(400).json({ error: e.message }); }
+        res.json(listUC.rename(req.params.id as string, name));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
-app.delete('/api/lists/:id', (req, res) => {
+app.delete('/api/lists/:id', (req: Request, res: Response) => {
     try {
-        listUC.remove(req.params.id);
+        listUC.remove(req.params.id as string);
         res.json({ success: true });
-    } catch (e) { res.status(400).json({ error: e.message }); }
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
-app.get('/api/lists/:id/groups', (req, res) => {
-    try { res.json(groupUC.forList(req.params.id)); }
-    catch (e) { res.status(400).json({ error: e.message }); }
+app.get('/api/lists/:id/groups', (req: Request, res: Response) => {
+    try { res.json(groupUC.forList(req.params.id as string)); }
+    catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
-app.post('/api/lists/:id/groups', (req, res) => {
+app.post('/api/lists/:id/groups', (req: Request, res: Response) => {
     try {
         const { wppId, name } = req.body;
-        groupUC.add(req.params.id, wppId, name || '');
+        groupUC.add(req.params.id as string, wppId, name || '');
         res.json({ success: true });
-    } catch (e) { res.status(400).json({ error: e.message }); }
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
-app.delete('/api/groups/:id', (req, res) => {
+app.delete('/api/groups/:id', (req: Request, res: Response) => {
     try {
-        groupUC.remove(req.params.id);
+        groupUC.remove(req.params.id as string);
         res.json({ success: true });
-    } catch (e) { res.status(400).json({ error: e.message }); }
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
-app.post('/api/broadcast', async (req, res) => {
-    if (!isConnected) return res.status(400).json({ error: 'Client not connected' });
+app.post('/api/broadcast', async (req: Request, res: Response): Promise<void> => {
+    if (!isConnected) { res.status(400).json({ error: 'Client not connected' }); return; }
     try {
         const { listId, message } = req.body;
         const result = await broadcastUC.execute({ listId, content: message, sentBy: 'Web UI' });
         res.json(result);
-    } catch (e) { res.status(400).json({ error: e.message }); }
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
-app.get('/api/history', (req, res) => res.json(messageRepo.getHistory()));
+app.get('/api/history', (req: Request, res: Response) => { res.json(messageRepo.getHistory()); });

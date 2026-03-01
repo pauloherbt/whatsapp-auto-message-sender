@@ -1,11 +1,13 @@
-'use strict';
+import listRepo from '../../infrastructure/persistence/SqliteListRepository';
 
 class ManageLists {
-    constructor(listRepo) {
-        this.repositories = { lists: listRepo };
+    private repositories: { lists: typeof listRepo };
+
+    constructor(repo: typeof listRepo) {
+        this.repositories = { lists: repo };
     }
 
-    create(name) {
+    create(name: string) {
         const existing = this.repositories.lists.getByName(name);
         if (existing) throw new Error(`Lista "${name}" já existe.`);
         return this.repositories.lists.create(name);
@@ -15,11 +17,11 @@ class ManageLists {
         return this.repositories.lists.getAll();
     }
 
-    getById(id) {
+    getById(id: number | string) {
         return this.repositories.lists.getById(id);
     }
 
-    rename(id, newName) {
+    rename(id: number | string, newName: string) {
         const existing = this.repositories.lists.getById(id);
         if (!existing) throw new Error(`Lista ID ${id} não encontrada para edição.`);
 
@@ -29,11 +31,11 @@ class ManageLists {
         return this.repositories.lists.update(id, newName);
     }
 
-    remove(id) {
+    remove(id: number | string) {
         const existing = this.repositories.lists.getById(id);
         if (!existing) throw new Error(`Lista ID ${id} não encontrada para exclusão.`);
         return this.repositories.lists.delete(id);
     }
 }
 
-module.exports = ManageLists;
+export default ManageLists;
