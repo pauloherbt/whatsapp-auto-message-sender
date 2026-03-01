@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 function Table({
   className,
   ...props
-}) {
+}: any) {
   return (
     <div data-slot="table-container" className="relative w-full overflow-x-auto">
       <table
@@ -21,7 +21,7 @@ function Table({
 function TableHeader({
   className,
   ...props
-}) {
+}: any) {
   return (
     <thead
       data-slot="table-header"
@@ -33,7 +33,7 @@ function TableHeader({
 function TableBody({
   className,
   ...props
-}) {
+}: any) {
   return (
     <tbody
       data-slot="table-body"
@@ -45,7 +45,7 @@ function TableBody({
 function TableFooter({
   className,
   ...props
-}) {
+}: any) {
   return (
     <tfoot
       data-slot="table-footer"
@@ -57,7 +57,7 @@ function TableFooter({
 function TableRow({
   className,
   ...props
-}) {
+}: any) {
   return (
     <tr
       data-slot="table-row"
@@ -72,7 +72,7 @@ function TableRow({
 function TableHead({
   className,
   ...props
-}) {
+}: any) {
   return (
     <th
       data-slot="table-head"
@@ -87,7 +87,7 @@ function TableHead({
 function TableCell({
   className,
   ...props
-}) {
+}: any) {
   return (
     <td
       data-slot="table-cell"
@@ -102,7 +102,7 @@ function TableCell({
 function TableCaption({
   className,
   ...props
-}) {
+}: any) {
   return (
     <caption
       data-slot="table-caption"

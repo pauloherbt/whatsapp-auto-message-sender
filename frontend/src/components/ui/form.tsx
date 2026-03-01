@@ -7,12 +7,12 @@ import { Label } from "@/components/ui/label"
 
 const Form = FormProvider
 
-const FormFieldContext = React.createContext({})
+const FormFieldContext = React.createContext<{ name: string }>({} as any)
 
 const FormField = (
   {
     ...props
-  }
+  }: any
 ) => {
   return (
     <FormFieldContext.Provider value={{ name: props.name }}>
@@ -44,12 +44,12 @@ const useFormField = () => {
   }
 }
 
-const FormItemContext = React.createContext({})
+const FormItemContext = React.createContext<{ id: string }>({} as any)
 
 function FormItem({
   className,
   ...props
-}) {
+}: any) {
   const id = React.useId()
 
   return (
@@ -62,7 +62,7 @@ function FormItem({
 function FormLabel({
   className,
   ...props
-}) {
+}: any) {
   const { error, formItemId } = useFormField()
 
   return (
@@ -77,7 +77,7 @@ function FormLabel({
 
 function FormControl({
   ...props
-}) {
+}: any) {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
 
   return (
@@ -97,7 +97,7 @@ function FormControl({
 function FormDescription({
   className,
   ...props
-}) {
+}: any) {
   const { formDescriptionId } = useFormField()
 
   return (
@@ -112,7 +112,7 @@ function FormDescription({
 function FormMessage({
   className,
   ...props
-}) {
+}: any) {
   const { error, formMessageId } = useFormField()
   const body = error ? String(error?.message ?? "") : props.children
 

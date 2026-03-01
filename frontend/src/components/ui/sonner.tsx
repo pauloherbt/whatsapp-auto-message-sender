@@ -10,12 +10,12 @@ import { Toaster as Sonner } from "sonner";
 
 const Toaster = ({
   ...props
-}) => {
+}: any) => {
   const { theme = "system" } = useTheme()
 
   return (
     <Sonner
-      theme={theme}
+      theme={theme as any}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,
@@ -30,7 +30,7 @@ const Toaster = ({
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)"
-        }
+        } as React.CSSProperties
       }
       {...props} />
   );
