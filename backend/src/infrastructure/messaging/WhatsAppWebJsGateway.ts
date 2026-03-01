@@ -1,4 +1,4 @@
-import { Client } from 'whatsapp-web.js';
+import type { Client } from 'whatsapp-web.js';
 
 class WhatsAppWebJsGateway {
     private client: Client;

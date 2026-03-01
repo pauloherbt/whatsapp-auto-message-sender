@@ -107,7 +107,6 @@ const client = new Client({
     },
     puppeteer: {
         headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -180,68 +179,15 @@ cleanupLocks();
 client.initialize().catch(err => console.error('[whatsapp-web] Fatal init error:', err));
 
 // --- API ROUTES ---
+import { createApiRouter } from './infrastructure/web/routes/api';
 
-app.get('/api/whatsapp-groups', async (req: Request, res: Response): Promise<void> => {
-    if (!isConnected) { res.status(400).json({ error: 'Client not connected' }); return; }
-    try {
-        const groups = await messagingGateway.fetchGroups();
-        res.json(groups);
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
-});
+const apiRoutes = createApiRouter(
+    () => isConnected, // Expose connection checker callback
+    messagingGateway,
+    listUC,
+    groupUC,
+    broadcastUC,
+    messageRepo
+);
 
-app.get('/api/lists', (req: Request, res: Response) => { res.json(listUC.getAll()); });
-
-app.post('/api/lists', (req: Request, res: Response): void => {
-    try {
-        const { name } = req.body;
-        if (!name) { res.status(400).json({ error: 'Name is required' }); return; }
-        res.json(listUC.create(name));
-    } catch (e: any) { res.status(400).json({ error: e.message }); }
-});
-
-app.put('/api/lists/:id', (req: Request, res: Response) => {
-    try {
-        const { name } = req.body;
-        res.json(listUC.rename(req.params.id as string, name));
-    } catch (e: any) { res.status(400).json({ error: e.message }); }
-});
-
-app.delete('/api/lists/:id', (req: Request, res: Response) => {
-    try {
-        listUC.remove(req.params.id as string);
-        res.json({ success: true });
-    } catch (e: any) { res.status(400).json({ error: e.message }); }
-});
-
-app.get('/api/lists/:id/groups', (req: Request, res: Response) => {
-    try { res.json(groupUC.forList(req.params.id as string)); }
-    catch (e: any) { res.status(400).json({ error: e.message }); }
-});
-
-app.post('/api/lists/:id/groups', (req: Request, res: Response) => {
-    try {
-        const { wppId, name } = req.body;
-        groupUC.add(req.params.id as string, wppId, name || '');
-        res.json({ success: true });
-    } catch (e: any) { res.status(400).json({ error: e.message }); }
-});
-
-app.delete('/api/groups/:id', (req: Request, res: Response) => {
-    try {
-        groupUC.remove(req.params.id as string);
-        res.json({ success: true });
-    } catch (e: any) { res.status(400).json({ error: e.message }); }
-});
-
-app.post('/api/broadcast', async (req: Request, res: Response): Promise<void> => {
-    if (!isConnected) { res.status(400).json({ error: 'Client not connected' }); return; }
-    try {
-        const { listId, message } = req.body;
-        const result = await broadcastUC.execute({ listId, content: message, sentBy: 'Web UI' });
-        res.json(result);
-    } catch (e: any) { res.status(400).json({ error: e.message }); }
-});
-
-app.get('/api/history', (req: Request, res: Response) => { res.json(messageRepo.getHistory()); });
+app.use('/api', apiRoutes);
