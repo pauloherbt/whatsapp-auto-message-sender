@@ -29,12 +29,8 @@ class WhatsAppWebJsGateway {
         try {
             console.log(`[whatsapp-web] Fetching groups...`);
 
-            const chatsPromise = this.client.getChats();
-            const timeoutPromise = new Promise<any[]>((_, reject) =>
-                setTimeout(() => reject(new Error('Timeout fetching chats from WhatsApp')), 15000)
-            );
+            const chats = await this.client.getChats();
 
-            const chats = await Promise.race([chatsPromise, timeoutPromise]);
             const groups = chats.filter((chat: any) => chat.isGroup);
 
             // Format to match old evolution response somewhat:
