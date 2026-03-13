@@ -10,6 +10,7 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [qrGeneratedAt, setQrGeneratedAt] = useState<number | null>(null);
   // Ref to allow the polling closure to read the latest connection state
   const isConnectedRef = useRef(false);
 
@@ -24,8 +25,10 @@ export default function App() {
         if (data.connected) {
           // Connected: clear the QR so it doesn't linger in memory
           setQrCode(null);
+          setQrGeneratedAt(null);
         } else if (data.qr) {
           setQrCode(data.qr);
+          if (data.qrGeneratedAt) setQrGeneratedAt(data.qrGeneratedAt);
         }
       } catch (err) {
         console.error('Status check error:', err);
@@ -81,7 +84,7 @@ export default function App() {
         {isConnected ? (
           <Dashboard />
         ) : (
-          <QRScanner qrCode={qrCode} isAuthenticating={isAuthenticating} />
+          <QRScanner qrCode={qrCode} qrGeneratedAt={qrGeneratedAt} isAuthenticating={isAuthenticating} />
         )}
       </div>
 

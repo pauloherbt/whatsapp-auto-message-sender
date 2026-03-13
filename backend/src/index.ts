@@ -28,6 +28,7 @@ app.use(cors());
 
 // Variables for status tracking
 let latestQR: string | null = null;
+let qrGeneratedAt: number | null = null;
 let isConnected = false;
 let isAuthenticating = false;
 
@@ -78,7 +79,8 @@ app.get('/api/status', (req: Request, res: Response) => {
     res.json({
         connected: isConnected,
         authenticating: isAuthenticating,
-        qr: latestQR
+        qr: latestQR,
+        qrGeneratedAt   // epoch ms — lets the frontend show a freshness countdown
     });
 });
 
@@ -166,6 +168,7 @@ client.on('qr', (qr: string) => {
     console.log(`[whatsapp-web] QR Code received! Ready to scan. (length=${sanitizedQR.length})`);
     console.log(`[whatsapp-web] Access the frontend to scan the QR Code visually.`);
     latestQR = sanitizedQR;
+    qrGeneratedAt = Date.now();
     isConnected = false;
     isAuthenticating = false;
 });
