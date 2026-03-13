@@ -12,14 +12,8 @@ class WhatsAppWebJsGateway {
 
     async sendText(to: string, text: string) {
         let target = to;
-        // whatsapp-web.js usually expects numbers or groups without "@s.whatsapp.net" or with it?
-        // the library uses "number@c.us" or "number@g.us".
-        // Often full JIDs look like 123456789@c.us
-        // Let's ensure the format is correct based on whether it's a group or dm.
-
         try {
             console.log(`[whatsapp-web] Sending to ${target}: "${text.substring(0, 30)}..."`);
-            // We can just use client.sendMessage
             const chat = await this.client.sendMessage(target, text);
             return chat;
         } catch (err: any) {
@@ -43,23 +37,44 @@ class WhatsAppWebJsGateway {
             return this.groupsCache!.data;
         }
 
+        console.log(`[whatsapp-web] Fetching groups from WhatsApp...`);
+
         try {
-            console.log(`[whatsapp-web] Fetching groups from WhatsApp...`);
+            // Fast path: access WhatsApp Web's in-memory Store directly inside Chromium.
+            // This filters groups BEFORE serialisation to Node.js, avoiding the full
+            // getChats() round-trip which serialises every single chat.
+            const page = (this.client as any).pupPage;
+            const result: { id: string; subject: string }[] = await page.evaluate(() => {
+                const store = (window as any).Store;
+                if (!store?.Chat) return null; // Store not ready yet
 
+                return store.Chat.getModelsArray()
+                    .filter((chat: any) => chat.isGroup)
+                    .map((chat: any) => ({
+                        id: chat.id._serialized,
+                        subject: chat.name || chat.formattedTitle || ''
+                    }));
+            });
+
+            if (result !== null) {
+                this.groupsCache = { data: result, fetchedAt: Date.now() };
+                console.log(`[whatsapp-web] Fetched and cached ${result.length} groups (via Store).`);
+                return result;
+            }
+
+            // Fallback: Store not available yet, use the regular API
+            console.log(`[whatsapp-web] Store not ready, falling back to getChats()...`);
             const chats = await this.client.getChats();
-
             const groups = chats.filter((chat: any) => chat.isGroup);
-
-            // Format to match old evolution response somewhat:
-            // { id, subject }
-            const result = groups.map((g: any) => ({
+            const fallbackResult = groups.map((g: any) => ({
                 id: g.id._serialized,
                 subject: g.name
             }));
 
-            this.groupsCache = { data: result, fetchedAt: Date.now() };
-            console.log(`[whatsapp-web] Fetched and cached ${result.length} groups.`);
-            return result;
+            this.groupsCache = { data: fallbackResult, fetchedAt: Date.now() };
+            console.log(`[whatsapp-web] Fetched and cached ${fallbackResult.length} groups (via getChats fallback).`);
+            return fallbackResult;
+
         } catch (err: any) {
             console.error(`[whatsapp-web] Error fetching groups:`, err.message);
             throw err;
@@ -68,4 +83,5 @@ class WhatsAppWebJsGateway {
 }
 
 export default WhatsAppWebJsGateway;
+
 
