@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from './lib/api';
 import QRScanner from './components/QRScanner';
 import Dashboard from './components/Dashboard';
@@ -9,14 +9,22 @@ import { Toaster } from '@/components/ui/sonner';
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [qrCode, setQrCode] = useState(null);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  // Ref to allow the polling closure to read the latest connection state
+  const isConnectedRef = useRef(false);
+
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const data = await api.getStatus();
+        isConnectedRef.current = data.connected;
         setIsConnected(data.connected);
         setIsAuthenticating(data.authenticating);
-        if (!data.connected && data.qr) {
+
+        if (data.connected) {
+          // Connected: clear the QR so it doesn't linger in memory
+          setQrCode(null);
+        } else if (data.qr) {
           setQrCode(data.qr);
         }
       } catch (err) {
@@ -27,18 +35,18 @@ export default function App() {
     // Initial check
     checkStatus();
 
-    // Poll every 10 seconds to reduce server load
-    let timeoutId;
+    let timeoutId: ReturnType<typeof setTimeout>;
     const poll = async () => {
+      // Stop polling once connected — no need to keep checking
+      if (isConnectedRef.current) return;
       await checkStatus();
-      timeoutId = setTimeout(poll, 10000);
+      // Poll every 3s while waiting for QR / auth, stops itself when connected
+      timeoutId = setTimeout(poll, 3000);
     };
 
-    timeoutId = setTimeout(poll, 10000);
+    timeoutId = setTimeout(poll, 3000);
 
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
+    return () => clearTimeout(timeoutId);
   }, []);
 
   return (

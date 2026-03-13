@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 
 // Interfaces for dependency injection
 interface MessagingGateway {
-    fetchGroups(): Promise<any[]>;
+    fetchGroups(forceRefresh?: boolean): Promise<any[]>;
 }
 
 interface ListUseCase {
@@ -39,7 +39,8 @@ export function createApiRouter(
     router.get('/whatsapp-groups', async (req: Request, res: Response): Promise<void> => {
         if (!getConnectionStatus()) { res.status(400).json({ error: 'Client not connected' }); return; }
         try {
-            const groups = await messagingGateway.fetchGroups();
+            const forceRefresh = req.query.refresh === 'true';
+            const groups = await messagingGateway.fetchGroups(forceRefresh);
             res.json(groups);
         } catch (e: any) {
             res.status(500).json({ error: e.message });

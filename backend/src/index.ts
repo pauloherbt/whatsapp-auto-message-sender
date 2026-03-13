@@ -96,6 +96,7 @@ process.on('uncaughtException', (err) => {
 
 const puppeteerOptions: any = {
     headless: true,
+    protocolTimeout: 120000, // 120s — default 30s is too short for getChats() on slow servers
     args: [
         // --- Segurança / Sandbox (necessário em containers e VMs) ---
         '--no-sandbox',

@@ -1,7 +1,10 @@
 import type { Client } from 'whatsapp-web.js';
 
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 class WhatsAppWebJsGateway {
     private client: Client;
+    private groupsCache: { data: any[]; fetchedAt: number } | null = null;
 
     constructor(client: Client) {
         this.client = client;
@@ -25,9 +28,23 @@ class WhatsAppWebJsGateway {
         }
     }
 
-    async fetchGroups() {
+    invalidateCache() {
+        this.groupsCache = null;
+    }
+
+    async fetchGroups(forceRefresh = false) {
+        const now = Date.now();
+        const isCacheValid = !forceRefresh &&
+            this.groupsCache !== null &&
+            (now - this.groupsCache.fetchedAt) < CACHE_TTL_MS;
+
+        if (isCacheValid) {
+            console.log(`[whatsapp-web] Returning cached groups (age: ${Math.round((now - this.groupsCache!.fetchedAt) / 1000)}s)`);
+            return this.groupsCache!.data;
+        }
+
         try {
-            console.log(`[whatsapp-web] Fetching groups...`);
+            console.log(`[whatsapp-web] Fetching groups from WhatsApp...`);
 
             const chats = await this.client.getChats();
 
@@ -35,10 +52,14 @@ class WhatsAppWebJsGateway {
 
             // Format to match old evolution response somewhat:
             // { id, subject }
-            return groups.map((g: any) => ({
+            const result = groups.map((g: any) => ({
                 id: g.id._serialized,
                 subject: g.name
             }));
+
+            this.groupsCache = { data: result, fetchedAt: Date.now() };
+            console.log(`[whatsapp-web] Fetched and cached ${result.length} groups.`);
+            return result;
         } catch (err: any) {
             console.error(`[whatsapp-web] Error fetching groups:`, err.message);
             throw err;
@@ -47,3 +68,4 @@ class WhatsAppWebJsGateway {
 }
 
 export default WhatsAppWebJsGateway;
+
