@@ -97,15 +97,45 @@ process.on('uncaughtException', (err) => {
 const puppeteerOptions: any = {
     headless: true,
     args: [
+        // --- Segurança / Sandbox (necessário em containers e VMs) ---
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
+
+        // --- Memória crítica ---
+        '--disable-dev-shm-usage',          // Usa /tmp em vez de /dev/shm (evita OOM em VMs)
+        '--renderer-process-limit=1',        // Apenas 1 renderer ativo
+        '--js-flags=--max-old-space-size=512', // Limita heap do V8 a 512MB
+
+        // --- GPU / Renderização (sem GPU em headless) ---
         '--disable-gpu',
+        '--disable-accelerated-2d-canvas',
+        '--disable-accelerated-jpeg-decoding',
+        '--disable-accelerated-mjpeg-decode',
+        '--disable-accelerated-video-decode',
+        '--disable-software-rasterizer',
+
+        // --- Features desnecessárias (economia de memória e CPU) ---
         '--disable-extensions',
+        '--disable-sync',
+        '--disable-translate',
+        '--disable-default-apps',
+        '--disable-background-networking',
+        '--disable-background-timer-throttling',
+        '--disable-client-side-phishing-detection',
+        '--disable-hang-monitor',
+        '--disable-popup-blocking',
+        '--disable-prompt-on-repost',
+        '--disable-domain-reliability',
+        '--disable-features=AudioServiceOutOfProcess,TranslateUI',
+        '--no-first-run',
         '--no-default-browser-check',
         '--ignore-certificate-errors',
+        '--metrics-recording-only',
+        '--safebrowsing-disable-auto-update',
+        '--mute-audio',
+        '--window-size=1280,800',            // Garante tamanho mínimo de viewport
+
+        // --- User-agent para compatibilidade ---
         '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     ]
 };
@@ -132,7 +162,8 @@ const broadcastUC = new BroadcastMessage(messagingGateway, listRepo, groupRepo, 
 
 client.on('qr', (qr: string) => {
     const sanitizedQR = qr.startsWith('undefined,') ? qr.substring(10) : qr;
-    console.log('[whatsapp-web] QR Code received! Ready to scan.');
+    console.log(`[whatsapp-web] QR Code received! Ready to scan. (length=${sanitizedQR.length})`);
+    console.log(`[whatsapp-web] Access the frontend to scan the QR Code visually.`);
     latestQR = sanitizedQR;
     isConnected = false;
     isAuthenticating = false;
