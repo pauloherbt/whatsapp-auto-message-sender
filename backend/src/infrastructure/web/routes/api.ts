@@ -54,6 +54,17 @@ router.post('/wpp/request-pairing-code', async (req: AuthRequest, res: Response)
     if (!phone) { res.status(400).json({ error: 'phone is required' }); return; }
     const normalized = String(phone).replace(/\D/g, '');
     try {
+        const pupPage = (session.client as any).pupPage;
+
+        // whatsapp-web.js only exposes window.onCodeReceivedEvent when the client is
+        // initialized with pairWithPhoneNumber option. Since we use QR-first init,
+        // we must inject the function manually before calling requestPairingCode().
+        await pupPage.evaluate(() => {
+            if (typeof (window as any).onCodeReceivedEvent === 'undefined') {
+                (window as any).onCodeReceivedEvent = (code: string) => code;
+            }
+        });
+
         const code = await session.client.requestPairingCode(normalized);
         session.pairingCode = code;
         res.json({ code });
