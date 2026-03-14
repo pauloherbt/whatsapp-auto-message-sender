@@ -18,9 +18,17 @@ class SqliteDatabase {
 
   private _initSchema() {
     this.db.exec(`
+          CREATE TABLE IF NOT EXISTS users (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            email         TEXT    NOT NULL UNIQUE,
+            password_hash TEXT    NOT NULL,
+            created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+          );
+
           CREATE TABLE IF NOT EXISTS lists (
-            id   INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT    NOT NULL UNIQUE
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            name    TEXT    NOT NULL
           );
         
           CREATE TABLE IF NOT EXISTS groups (
@@ -33,6 +41,7 @@ class SqliteDatabase {
         
           CREATE TABLE IF NOT EXISTS messages (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,
             list_id      INTEGER REFERENCES lists(id) ON DELETE SET NULL,
             list_name    TEXT    NOT NULL DEFAULT '',
             content      TEXT    NOT NULL,
@@ -42,6 +51,13 @@ class SqliteDatabase {
             success      INTEGER NOT NULL DEFAULT 0
           );
         `);
+
+    // Non-destructive migrations for existing databases
+    const addColIfMissing = (table: string, col: string, def: string) => {
+      try { this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); } catch { /* already exists */ }
+    };
+    addColIfMissing('lists', 'user_id', 'INTEGER REFERENCES users(id) ON DELETE CASCADE');
+    addColIfMissing('messages', 'user_id', 'INTEGER REFERENCES users(id) ON DELETE SET NULL');
   }
 
   prepare(sql: string): Database.Statement {

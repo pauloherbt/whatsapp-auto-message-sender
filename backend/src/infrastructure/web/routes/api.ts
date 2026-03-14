@@ -1,106 +1,139 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
+import { AuthRequest } from '../middleware/authMiddleware';
+import { getOrCreateSession, destroySession } from '../../messaging/WhatsAppClientPool';
+import listRepo from '../../persistence/SqliteListRepository';
+import groupRepo from '../../persistence/SqliteGroupRepository';
+import messageRepo from '../../persistence/SqliteMessageRepository';
+import ManageLists from '../../../application/use-cases/ManageLists';
+import ManageGroups from '../../../application/use-cases/ManageGroups';
+import BroadcastMessage from '../../../application/use-cases/BroadcastMessage';
 
-// Interfaces for dependency injection
-interface MessagingGateway {
-    fetchGroups(forceRefresh?: boolean): Promise<any[]>;
-}
+const listUC = new ManageLists();
+const groupUC = new ManageGroups(groupRepo, listRepo);
 
-interface ListUseCase {
-    create(name: string): any;
-    getAll(): any[];
-    rename(id: string, name: string): any;
-    remove(id: string): any;
-}
+const router = Router();
 
-interface GroupUseCase {
-    forList(listId: string): any[];
-    add(listId: string, wppId: string, name: string): any;
-    remove(id: string): any;
-}
+// ── WhatsApp Status & Connection ───────────────────────────────────────────
 
-interface BroadcastUseCase {
-    execute(options: { listId: string, content: string, sentBy: string }): Promise<any>;
-}
-
-interface MessageRepository {
-    getHistory(): any[];
-}
-
-export function createApiRouter(
-    getConnectionStatus: () => boolean,
-    messagingGateway: MessagingGateway,
-    listUC: ListUseCase,
-    groupUC: GroupUseCase,
-    broadcastUC: BroadcastUseCase,
-    messageRepo: MessageRepository
-): Router {
-    const router = Router();
-
-    router.get('/whatsapp-groups', async (req: Request, res: Response): Promise<void> => {
-        if (!getConnectionStatus()) { res.status(400).json({ error: 'Client not connected' }); return; }
-        try {
-            const forceRefresh = req.query.refresh === 'true';
-            const groups = await messagingGateway.fetchGroups(forceRefresh);
-            res.json(groups);
-        } catch (e: any) {
-            res.status(500).json({ error: e.message });
-        }
+router.get('/wpp/status', (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    const session = getOrCreateSession(userId);
+    res.json({
+        connected: session.isConnected,
+        authenticating: session.isAuthenticating,
+        qr: session.qr,
+        qrGeneratedAt: session.qrGeneratedAt,
+        pairingCode: session.pairingCode,
     });
+});
 
-    router.get('/lists', (req: Request, res: Response) => { res.json(listUC.getAll()); });
+router.post('/wpp/connect', (req: AuthRequest, res: Response) => {
+    const userId = req.userId!;
+    getOrCreateSession(userId); // lazy-init
+    res.json({ message: 'Connecting...' });
+});
 
-    router.post('/lists', (req: Request, res: Response): void => {
-        try {
-            const { name } = req.body;
-            if (!name) { res.status(400).json({ error: 'Name is required' }); return; }
-            res.json(listUC.create(name));
-        } catch (e: any) { res.status(400).json({ error: e.message }); }
-    });
+router.post('/wpp/disconnect', async (req: AuthRequest, res: Response) => {
+    await destroySession(req.userId!);
+    res.json({ message: 'Disconnected and session cleared.' });
+});
 
-    router.put('/lists/:id', (req: Request, res: Response) => {
-        try {
-            const { name } = req.body;
-            res.json(listUC.rename(req.params.id as string, name));
-        } catch (e: any) { res.status(400).json({ error: e.message }); }
-    });
+router.post('/wpp/request-pairing-code', async (req: AuthRequest, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const session = getOrCreateSession(userId);
+    if (session.isConnected) { res.status(400).json({ error: 'Already connected' }); return; }
+    const { phone } = req.body;
+    if (!phone) { res.status(400).json({ error: 'phone is required' }); return; }
+    const normalized = String(phone).replace(/\D/g, '');
+    try {
+        const code = await session.client.requestPairingCode(normalized);
+        session.pairingCode = code;
+        res.json({ code });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
-    router.delete('/lists/:id', (req: Request, res: Response) => {
-        try {
-            listUC.remove(req.params.id as string);
-            res.json({ success: true });
-        } catch (e: any) { res.status(400).json({ error: e.message }); }
-    });
+router.get('/wpp/groups', async (req: AuthRequest, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const session = getOrCreateSession(userId);
+    if (!session.isConnected) { res.status(400).json({ error: 'WhatsApp not connected' }); return; }
+    try {
+        const forceRefresh = req.query.refresh === 'true';
+        const groups = await session.gateway.fetchGroups(forceRefresh);
+        res.json(groups);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
-    router.get('/lists/:id/groups', (req: Request, res: Response) => {
-        try { res.json(groupUC.forList(req.params.id as string)); }
-        catch (e: any) { res.status(400).json({ error: e.message }); }
-    });
+// ── Lists ──────────────────────────────────────────────────────────────────
 
-    router.post('/lists/:id/groups', (req: Request, res: Response) => {
-        try {
-            const { wppId, name } = req.body;
-            groupUC.add(req.params.id as string, wppId, name || '');
-            res.json({ success: true });
-        } catch (e: any) { res.status(400).json({ error: e.message }); }
-    });
+router.get('/lists', (req: AuthRequest, res: Response) => {
+    res.json(listUC.getAll(req.userId!));
+});
 
-    router.delete('/groups/:id', (req: Request, res: Response) => {
-        try {
-            groupUC.remove(req.params.id as string);
-            res.json({ success: true });
-        } catch (e: any) { res.status(400).json({ error: e.message }); }
-    });
+router.post('/lists', (req: AuthRequest, res: Response): void => {
+    try {
+        const { name } = req.body;
+        if (!name) { res.status(400).json({ error: 'Name is required' }); return; }
+        res.json(listUC.create(req.userId!, name));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
 
-    router.post('/broadcast', async (req: Request, res: Response): Promise<void> => {
-        if (!getConnectionStatus()) { res.status(400).json({ error: 'Client not connected' }); return; }
-        try {
-            const { listId, message } = req.body;
-            const result = await broadcastUC.execute({ listId, content: message, sentBy: 'Web UI' });
-            res.json(result);
-        } catch (e: any) { res.status(400).json({ error: e.message }); }
-    });
+router.put('/lists/:id', (req: AuthRequest, res: Response) => {
+    try {
+        res.json(listUC.rename(String(req.params.id), req.body.name));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
 
-    router.get('/history', (req: Request, res: Response) => { res.json(messageRepo.getHistory()); });
+router.delete('/lists/:id', (req: AuthRequest, res: Response) => {
+    try {
+        listUC.remove(String(req.params.id));
+        res.json({ success: true });
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
 
-    return router;
-}
+// ── Groups in lists ────────────────────────────────────────────────────────
+
+router.get('/lists/:id/groups', (req: AuthRequest, res: Response) => {
+    try { res.json(groupUC.forList(String(req.params.id))); }
+    catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+
+router.post('/lists/:id/groups', (req: AuthRequest, res: Response) => {
+    try {
+        const { wppId, name } = req.body;
+        groupUC.add(String(req.params.id), wppId, name || '');
+        res.json({ success: true });
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+
+router.delete('/groups/:id', (req: AuthRequest, res: Response) => {
+    try {
+        groupUC.remove(String(req.params.id));
+        res.json({ success: true });
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+
+// ── Broadcast ──────────────────────────────────────────────────────────────
+
+router.post('/broadcast', async (req: AuthRequest, res: Response): Promise<void> => {
+    const userId = req.userId!;
+    const session = getOrCreateSession(userId);
+    if (!session.isConnected) { res.status(400).json({ error: 'WhatsApp not connected' }); return; }
+    try {
+        const { listId, message } = req.body;
+        const broadcastUC = new BroadcastMessage(session.gateway);
+        const result = await broadcastUC.execute({ userId, listId, content: message, sentBy: 'Web UI' });
+        res.json(result);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── History ────────────────────────────────────────────────────────────────
+
+router.get('/history', (req: AuthRequest, res: Response) => {
+    res.json(messageRepo.getHistory(req.userId!));
+});
+
+export { router as apiRouter };

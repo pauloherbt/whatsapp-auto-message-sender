@@ -4,6 +4,7 @@ import groupRepo from '../../infrastructure/persistence/SqliteGroupRepository';
 import messageRepo from '../../infrastructure/persistence/SqliteMessageRepository';
 
 interface BroadcastOptions {
+    userId: number;
     listId: number | string;
     content: string;
     sentBy: string;
@@ -11,27 +12,16 @@ interface BroadcastOptions {
 
 class BroadcastMessage {
     private messaging: WhatsAppWebJsGateway;
-    private listRepo: typeof listRepo;
-    private groupRepo: typeof groupRepo;
-    private messageRepo: typeof messageRepo;
 
-    constructor(
-        messagingGateway: WhatsAppWebJsGateway,
-        lRepo: typeof listRepo,
-        gRepo: typeof groupRepo,
-        mRepo: typeof messageRepo
-    ) {
+    constructor(messagingGateway: WhatsAppWebJsGateway) {
         this.messaging = messagingGateway;
-        this.listRepo = lRepo;
-        this.groupRepo = gRepo;
-        this.messageRepo = mRepo;
     }
 
-    async execute({ listId, content, sentBy }: BroadcastOptions) {
-        const list = this.listRepo.getById(listId);
+    async execute({ userId, listId, content, sentBy }: BroadcastOptions) {
+        const list = listRepo.getById(listId);
         if (!list) throw new Error('Lista não encontrada.');
 
-        const groups = this.groupRepo.forList(listId);
+        const groups = groupRepo.forList(listId);
         if (groups.length === 0) throw new Error('Esta lista não tem grupos cadastrados.');
 
         let successCount = 0;
@@ -39,7 +29,6 @@ class BroadcastMessage {
 
         for (const group of groups) {
             try {
-                // We send to the group JID (starts with 55...-...)
                 await this.messaging.sendText(group.wpp_group_id, content);
                 successCount++;
             } catch (err: any) {
@@ -47,9 +36,7 @@ class BroadcastMessage {
             }
         }
 
-        // Log the result
-        this.messageRepo.log(list.id, list.name, content, sentBy, total, successCount);
-
+        messageRepo.log(userId, list.id, list.name, content, sentBy, total, successCount);
         return { total, success: successCount };
     }
 }

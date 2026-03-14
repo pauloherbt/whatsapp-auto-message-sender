@@ -1,40 +1,28 @@
 import listRepo from '../../infrastructure/persistence/SqliteListRepository';
 
 class ManageLists {
-    private repositories: { lists: typeof listRepo };
-
-    constructor(repo: typeof listRepo) {
-        this.repositories = { lists: repo };
+    create(userId: number, name: string) {
+        return listRepo.create(userId, name);
     }
 
-    create(name: string) {
-        const existing = this.repositories.lists.getByName(name);
-        if (existing) throw new Error(`Lista "${name}" já existe.`);
-        return this.repositories.lists.create(name);
-    }
-
-    getAll() {
-        return this.repositories.lists.getAll();
+    getAll(userId: number) {
+        return listRepo.getAll(userId);
     }
 
     getById(id: number | string) {
-        return this.repositories.lists.getById(id);
+        return listRepo.getById(id);
     }
 
     rename(id: number | string, newName: string) {
-        const existing = this.repositories.lists.getById(id);
+        const existing = listRepo.getById(id);
         if (!existing) throw new Error(`Lista ID ${id} não encontrada para edição.`);
-
-        const existingName = this.repositories.lists.getByName(newName);
-        if (existingName && existingName.id !== id) throw new Error(`Já existe outra lista chamada "${newName}".`);
-
-        return this.repositories.lists.update(id, newName);
+        return listRepo.update(id, newName);
     }
 
     remove(id: number | string) {
-        const existing = this.repositories.lists.getById(id);
+        const existing = listRepo.getById(id);
         if (!existing) throw new Error(`Lista ID ${id} não encontrada para exclusão.`);
-        return this.repositories.lists.delete(id);
+        return listRepo.delete(id);
     }
 }
 
