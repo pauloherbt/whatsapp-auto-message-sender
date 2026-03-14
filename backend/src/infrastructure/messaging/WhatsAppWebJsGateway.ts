@@ -48,12 +48,15 @@ class WhatsAppWebJsGateway {
                 const store = (window as any).Store;
                 if (!store?.Chat) return null; // Store not ready yet
 
-                return store.Chat.getModelsArray()
-                    .filter((chat: any) => chat.isGroup)
-                    .map((chat: any) => ({
-                        id: chat.id._serialized,
-                        subject: chat.name || chat.formattedTitle || ''
-                    }));
+                const allChats = store.Chat.getModelsArray();
+                // Groups always have JIDs ending in @g.us — isGroup is a class getter
+                // not available on the raw Store model, so we filter by JID server instead.
+                const groups = allChats.filter((chat: any) => chat.id?.server === 'g.us');
+
+                return groups.map((chat: any) => ({
+                    id: chat.id._serialized,
+                    subject: chat.name || chat.formattedTitle || ''
+                }));
             });
 
             if (result !== null) {
