@@ -46,7 +46,12 @@ export default function QRScanner({ qrCode, qrGeneratedAt, isAuthenticating }: Q
             setPairingCode(data.code);
             toast.success('Código gerado! Insira-o no WhatsApp.');
         } catch (err: any) {
-            toast.error('Erro ao gerar código: ' + (err.response?.data?.error || err.message));
+            const errMsg = err.response?.data?.error || err.message;
+            const isNotReady = err.response?.status === 503;
+            toast.error(isNotReady
+                ? 'Aguarde o QR Code aparecer primeiro (WhatsApp ainda carregando...)'
+                : 'Erro ao gerar código: ' + errMsg
+            );
         } finally {
             setIsRequesting(false);
         }

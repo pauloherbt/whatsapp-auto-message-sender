@@ -42,6 +42,14 @@ router.post('/wpp/request-pairing-code', async (req: AuthRequest, res: Response)
     const userId = req.userId!;
     const session = getOrCreateSession(userId);
     if (session.isConnected) { res.status(400).json({ error: 'Already connected' }); return; }
+
+    // requestPairingCode() only works after the 'qr' event has fired at least once,
+    // because that's when WhatsApp Web finishes loading and sets up window.onCodeReceivedEvent.
+    if (!session.qr) {
+        res.status(503).json({ error: 'WhatsApp Web is still loading. Wait for the QR to appear and try again.' });
+        return;
+    }
+
     const { phone } = req.body;
     if (!phone) { res.status(400).json({ error: 'phone is required' }); return; }
     const normalized = String(phone).replace(/\D/g, '');
