@@ -1,29 +1,51 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './lib/api';
+import LoginPage from './components/LoginPage';
 import QRScanner from './components/QRScanner';
 import Dashboard from './components/Dashboard';
 import { Badge } from '@/components/ui/badge';
-import { MessageCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MessageCircle, LogOut } from 'lucide-react';
 import { Toaster } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 
 export default function App() {
+  // Auth state
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('wpp_token'));
+  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('wpp_email'));
+
+  // WhatsApp state
   const [isConnected, setIsConnected] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [qrGeneratedAt, setQrGeneratedAt] = useState<number | null>(null);
-  // Ref to allow the polling closure to read the latest connection state
   const isConnectedRef = useRef(false);
 
+  const handleAuthenticated = (newToken: string, email: string) => {
+    setToken(newToken);
+    setUserEmail(email);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('wpp_token');
+    localStorage.removeItem('wpp_email');
+    setToken(null);
+    setUserEmail(null);
+    setIsConnected(false);
+    setQrCode(null);
+  };
+
+  // Poll WhatsApp status — only when logged in
   useEffect(() => {
+    if (!token) return;
+
     const checkStatus = async () => {
       try {
         const data = await api.getStatus();
         isConnectedRef.current = data.connected;
         setIsConnected(data.connected);
         setIsAuthenticating(data.authenticating);
-
         if (data.connected) {
-          // Connected: clear the QR so it doesn't linger in memory
           setQrCode(null);
           setQrGeneratedAt(null);
         } else if (data.qr) {
@@ -35,22 +57,28 @@ export default function App() {
       }
     };
 
-    // Initial check
     checkStatus();
 
     let timeoutId: ReturnType<typeof setTimeout>;
     const poll = async () => {
-      // Stop polling once connected — no need to keep checking
       if (isConnectedRef.current) return;
       await checkStatus();
-      // Poll every 3s while waiting for QR / auth, stops itself when connected
       timeoutId = setTimeout(poll, 3000);
     };
 
     timeoutId = setTimeout(poll, 3000);
-
     return () => clearTimeout(timeoutId);
-  }, []);
+  }, [token]);
+
+  // Show login page if not authenticated
+  if (!token) {
+    return (
+      <>
+        <LoginPage onAuthenticated={handleAuthenticated} />
+        <Toaster position="bottom-right" richColors />
+      </>
+    );
+  }
 
   return (
     <div className="text-gray-800 antialiased min-h-screen flex flex-col items-center py-4 px-2 sm:py-6 sm:px-4 bg-gray-50">
@@ -60,9 +88,12 @@ export default function App() {
           <div className="bg-green-500 text-white p-2 rounded-lg shadow-sm">
             <MessageCircle className="w-6 h-6" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-gray-900">WPP Gerenciador de Grupos</h1>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-gray-900">WPP Gerenciador de Grupos</h1>
+            <p className="text-xs text-gray-400">{userEmail}</p>
+          </div>
         </div>
-        <div>
+        <div className="flex items-center gap-3">
           {isConnected ? (
             <Badge variant="default" className="bg-green-100 text-green-700 hover:bg-green-100 font-semibold px-3 py-1 text-sm rounded-full">
               Conectado
@@ -76,6 +107,9 @@ export default function App() {
               Aguardando QR Code
             </Badge>
           )}
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-gray-500 hover:text-red-500">
+            <LogOut className="w-4 h-4" />
+          </Button>
         </div>
       </header>
 
@@ -88,7 +122,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Sonner Toasts */}
       <Toaster position="bottom-right" richColors />
     </div>
   );
