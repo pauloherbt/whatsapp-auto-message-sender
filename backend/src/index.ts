@@ -29,6 +29,7 @@ app.use(cors());
 // Variables for status tracking
 let latestQR: string | null = null;
 let qrGeneratedAt: number | null = null;
+let latestPairingCode: string | null = null;
 let isConnected = false;
 let isAuthenticating = false;
 
@@ -80,8 +81,26 @@ app.get('/api/status', (req: Request, res: Response) => {
         connected: isConnected,
         authenticating: isAuthenticating,
         qr: latestQR,
-        qrGeneratedAt   // epoch ms — lets the frontend show a freshness countdown
+        qrGeneratedAt,
+        pairingCode: latestPairingCode
     });
+});
+
+app.post('/api/request-pairing-code', async (req: Request, res: Response): Promise<void> => {
+    if (isConnected) { res.status(400).json({ error: 'Already connected' }); return; }
+    const { phone } = req.body;
+    if (!phone) { res.status(400).json({ error: 'phone number is required' }); return; }
+    // Normalize: digits only
+    const normalized = String(phone).replace(/\D/g, '');
+    try {
+        const code = await client.requestPairingCode(normalized);
+        latestPairingCode = code;
+        console.log(`[whatsapp-web] Pairing code requested for ${normalized}: ${code}`);
+        res.json({ code });
+    } catch (err: any) {
+        console.error('[whatsapp-web] Pairing code error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.listen(port, () => {

@@ -71,5 +71,10 @@ export const api = {
     getHistory: async () => {
         const res = await apiClient.get('/history');
         return res.data;
-    }
+    },
+
+    requestPairingCode: async (phone: string) => {
+        const res = await apiClient.post('/request-pairing-code', { phone });
+        return res.data; // { code: 'XXXX-XXXX' }
+    },
 };
