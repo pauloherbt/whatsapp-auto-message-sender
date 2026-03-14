@@ -33,10 +33,10 @@ export default function Dashboard() {
         }
     };
 
-    const fetchGroups = async () => {
+    const fetchGroups = async (forceRefresh = false) => {
         setIsFetchingGroups(true);
         try {
-            const data = await api.getWhatsAppGroups();
+            const data = await api.getWhatsAppGroups(forceRefresh);
             setGroups(data);
         } catch (err) {
             toast.error('Erro ao carregar os grupos. Clique em Atualizar.');

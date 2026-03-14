@@ -30,7 +30,7 @@ export default function GroupLinker({ lists, groups, fetchGroups, isFetchingGrou
                 <CardTitle className="text-lg flex items-center gap-2">
                     <Link2 className="w-5 h-5 text-gray-500" /> Vincular Grupo
                 </CardTitle>
-                <Button variant="outline" size="sm" onClick={fetchGroups} disabled={isFetchingGroups} className="text-xs h-8">
+                <Button variant="outline" size="sm" onClick={() => fetchGroups(true)} disabled={isFetchingGroups} className="text-xs h-8">
                     <RefreshCcw className={`w-3.5 h-3.5 mr-1 ${isFetchingGroups ? 'animate-spin' : ''}`} /> Atualizar
                 </Button>
             </CardHeader>

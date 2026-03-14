@@ -37,8 +37,8 @@ export const api = {
         return res.data;
     },
 
-    getWhatsAppGroups: async () => {
-        const res = await apiClient.get('/whatsapp-groups');
+    getWhatsAppGroups: async (forceRefresh = false) => {
+        const res = await apiClient.get('/whatsapp-groups', { params: forceRefresh ? { refresh: 'true' } : {} });
         return res.data;
     },
 
