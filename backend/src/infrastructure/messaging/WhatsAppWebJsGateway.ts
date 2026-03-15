@@ -11,13 +11,13 @@ class WhatsAppWebJsGateway {
     }
 
     async sendText(to: string, text: string) {
-        let target = to;
         try {
-            console.log(`[whatsapp-web] Sending to ${target}: "${text.substring(0, 30)}..."`);
-            const chat = await this.client.sendMessage(target, text);
-            return chat;
+            console.log(`[whatsapp-web] Sending to ${to}: "${text.substring(0, 50)}"`);
+            const msg = await this.client.sendMessage(to, text);
+            console.log(`[whatsapp-web] ✅ Sent OK → msgId: ${msg?.id?.id ?? 'unknown'}`);
+            return msg;
         } catch (err: any) {
-            console.error(`[whatsapp-web] Error sending to ${target}:`, err.message);
+            console.error(`[whatsapp-web] ❌ Error sending to ${to}: ${err.message}`);
             throw err;
         }
     }
